@@ -1,0 +1,13 @@
+{
+  "name": "nspirelink",
+  "version": "1.0.0",
+  "description": "Send files to a TI-Nspire from the browser over WebUSB. A JavaScript port of libnspire.",
+  "license": "GPL-3.0-or-later",
+  "repository": "github:calcplex/nspirelink",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

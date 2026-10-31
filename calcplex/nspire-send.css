@@ -1,0 +1,24 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+   Copyright (C) 2026 CalcPlex. Part of nspirelink: https://github.com/calcplex/nspirelink
+
+   Send to calculator on the TI-Nspire games hub (nspire-send.mjs): ONLY
+   what the TI-84 Evo pages do not have. The panel, the split button, its
+   menu and the message boxes are the Evo's own rules (.btn, .evo-conn,
+   .evo-onesplit, .evo-split, .evo-box), which the site's build puts in
+   front of this file. */
+
+#ns-conn .ns-sub { margin: 8px 0 0; font-size: 15px; line-height: 1.5; }
+/* The Windows line under Connect: <html class="ns-onwin"> only. */
+#ns-conn .ns-winhint { display: none; }
+.ns-onwin #ns-conn .ns-winhint { display: block; }
+.evo-conn .btn:disabled { opacity: .6; cursor: default; }
+
+/* Where the script won't run (<html class="ns-nosend">, set in <head>, or
+   by the module when the games list does not load): one quiet line instead
+   of the panel, and the cards as they always were (Download, no Send). */
+#ns-conn .ns-off { display: none; }
+.ns-nosend #ns-conn .ns-on { display: none; }
+.ns-nosend #ns-conn .ns-off { display: block; margin: 0; font-size: 15px; }
+.ns-nosend #ns-conn { padding: 12px 18px; background: #f6f6f6; border-color: #e3e3e3; color: #555; box-shadow: none; }
+.ns-nosend .ns-send { display: none; }
+html:not(.ns-nosend) .ns-dl { display: none; }
