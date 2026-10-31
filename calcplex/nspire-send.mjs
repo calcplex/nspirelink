@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 CalcPlex. Part of nspirelink: https://github.com/calcplex/nspirelink
 //
-// Send to calculator on the TI-Nspire games hub, in the Evo pages' UI
-// (send-ui.mjs): the connect panel above the cards (.evo-conn, written into
-// the page by the build in the words painted here first), and on every card
-// the Evo game page's split button: Send to calculator, its arrow offering
+// Send to calculator on the TI-Nspire games and math pages, in the Evo
+// pages' UI (send-ui.mjs): the connect panel (.evo-conn, written into the
+// page by the build in the words painted here first), and on every card the
+// Evo game page's split button: Send to calculator, its arrow offering
 // Download and Delete from calculator; while the calculator has the game,
 // Delete (red), its arrow offering Send again and Download. Messages go in
 // the card's .evo-status box, as on the Evo hub.
+//
+// On a hub the panel sits above the cards and has a Connect button. On a
+// single game or program page (data-ns-page="leaf") the panel, the one card
+// and its messages share the Evo game page's box (.evo-sendbox), and there
+// is no Connect button: Send to calculator connects, as on the Evo page.
 //
 // Only the transport and the words are the Nspire's: the link is WebUSB
 // (nspirelink.mjs), the game goes into My Documents, and a game whose
@@ -16,7 +21,9 @@
 // so the game bytes never travel without it).
 //
 // The script tag carries data-ns-games, the URL of the games list:
-// [{ file, label, url, size, sha256, zip?, notice? }].
+// [{ file, label, url, size, sha256, zip?, notice? }], every file the hub
+// lists (a page under a hub reads the hub's list). data-ns-kind="programs"
+// marks the math hub and its pages.
 
 import { LINK_LOST } from '../nspirelink.mjs';
 import {
@@ -31,9 +38,14 @@ const PREVIEW = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 // ?win=1 previews the Windows wording on localhost.
 const PLATFORM = PREVIEW && /[?&]win=1\b/.test(location.search) ? 'windows' : platformOf(navigator);
 
+const LEAF = CFG.nsPage === 'leaf';
+const PROGRAMS = CFG.nsKind === 'programs';
+
 // The words the site's build writes into the panel, so the first paint here
 // changes nothing.
-const PANEL_ON = 'Plug in your TI-Nspire, turn it on, and click Connect to send games.';
+const PANEL_ON = LEAF ? 'Plug in your TI-Nspire, turn it on, and click Send to calculator.'
+  : PROGRAMS ? 'Plug in your TI-Nspire, turn it on, and click Connect to send programs.'
+    : 'Plug in your TI-Nspire, turn it on, and click Connect to send games.';
 const WIN_HINT = 'On Windows this works with the CX II. For an original CX, use TI\'s TI-Nspire software.';
 
 const panel = document.getElementById('ns-conn');
@@ -54,7 +66,17 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
-function changed() { for (const c of cards) c.paint(); }
+function changed() {
+  for (const c of cards) c.paint();
+  // A page's one card: the panel says whether the calculator has it.
+  if (LEAF && link && calc && !busy) paint('ok');
+}
+
+// A page has no Connect button: its Send to calculator connects.
+function failWords(reason) {
+  const text = failText(reason);
+  return LEAF ? text.replace(/\b([Cc])lick Connect\b/g, '$1lick Send to calculator') : text;
+}
 
 // ---------------------------------------------------------------------------
 // The panel (the Evo hub's .evo-conn: blue, green when connected, amber on a
@@ -68,15 +90,18 @@ function paint(state, extra = {}) {
   const hint = `<p class="ns-sub ns-winhint">${WIN_HINT}</p>`;
   panel.className = 'evo-conn' + (state === 'ok' ? ' ok' : state === 'fail' ? ' warn' : '');
   if (state === 'idle') {
-    on.innerHTML = `<p class="msg">${PANEL_ON}</p>${goButton()}${hint}`;
+    on.innerHTML = `<p class="msg">${PANEL_ON}</p>${LEAF ? '' : goButton()}${hint}`;
   } else if (state === 'connecting') {
-    on.innerHTML = `<p class="msg">${PANEL_ON}</p>${goButton('Select your calculator in the popup…', true)}`;
+    on.innerHTML = LEAF ? '<p class="msg">Select your calculator in the popup…</p>'
+      : `<p class="msg">${PANEL_ON}</p>${goButton('Select your calculator in the popup…', true)}`;
   } else if (state === 'ok') {
     let more = '';
-    on.innerHTML = `<p class="msg"><strong>Calculator connected.</strong> ${esc(calcLine(calc.info))} `
-      + 'Click Send to calculator on any game below.</p>' + more;
+    const one = LEAF ? cards[0] : null;
+    const next = !LEAF ? `Click Send to calculator on any ${PROGRAMS ? 'program' : 'game'} below.`
+      : one?.there?.ours ? `${esc(one.game.label)} is already on it.` : 'Click Send to calculator below.';
+    on.innerHTML = `<p class="msg"><strong>Calculator connected.</strong> ${esc(calcLine(calc.info))} ${next}</p>` + more;
   } else if (state === 'fail') {
-    on.innerHTML = `<p class="msg">${esc(failText(extra.reason))}</p>${goButton('Try again')}`;
+    on.innerHTML = `<p class="msg">${esc(failWords(extra.reason))}</p>${LEAF ? '' : goButton('Try again')}`;
   }
   on.querySelector('.ns-conn-go')?.addEventListener('click', () => { connect(); });
 }
@@ -100,8 +125,8 @@ async function connect() {
   try {
     link = await openLink();
     calc = await readCalculator(link, games);
-    paint('ok');
     for (const c of cards) c.there = calc.onCalc.get(c.game.file) ?? null;
+    paint('ok');
     track('nspire_connect', connectParams(calc));
     return true;
   } catch (e) {
@@ -184,7 +209,7 @@ async function gameBytes(game) {
 
 function mountCard(btn) {
   const game = games.find(g => g.file === btn.dataset.file);
-  const row = btn.closest('.wp-block-media-text__content');
+  const row = btn.closest('.wp-block-media-text__content, .evo-sendbox');
   if (!game || !row) return;
   const dl = row.querySelector('.ns-dl a');
   const status = document.createElement('div');
@@ -203,8 +228,10 @@ function mountCard(btn) {
     if (LINK_LOST.includes(e?.code) || !link?.opened) {
       await dropLink();
       paint('fail', { reason });
+      // a page's box already says it, in the panel's line
+      if (LEAF) return void showIn(status, '', '');
     }
-    showIn(status, `<p>${esc(failText(reason))}</p>`, 'bad');
+    showIn(status, `<p>${esc(failWords(reason))}</p>`, 'bad');
   }
 
   async function send(replace = false) {
